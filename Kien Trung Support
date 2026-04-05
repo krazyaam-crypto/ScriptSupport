@@ -16,22 +16,25 @@ local camera = workspace.CurrentCamera
 local AIMBOT = false
 local AUTOCLICK = false
 local currentTarget = nil
-local CLICK_DELAY = 0.1
 local CLICK_KEY = Enum.KeyCode.F
+local CLICK_DELAY = 0.1
+
+local speed = 16
+local jump = 50
+local graphics = 0
 
 -- GUI
 local gui = Instance.new("ScreenGui", game.CoreGui)
 gui.Name = "KienHub"
 
 local frame = Instance.new("Frame", gui)
-frame.Size = UDim2.new(0,320,0,420)
+frame.Size = UDim2.new(0,350,0,420)
 frame.Position = UDim2.new(0.03,0,0.2,0)
-frame.BackgroundColor3 = Color3.fromRGB(15,15,15)
+frame.BackgroundColor3 = Color3.fromRGB(20,20,20)
 frame.Active = true
 frame.Draggable = true
-Instance.new("UICorner", frame)
 
--- 🌈 Rainbow Stroke
+-- Rainbow viền
 local stroke = Instance.new("UIStroke", frame)
 stroke.Thickness = 3
 task.spawn(function()
@@ -45,36 +48,63 @@ end)
 
 -- TITLE
 local title = Instance.new("TextLabel", frame)
-title.Size = UDim2.new(1,0,0.1,0)
-title.BackgroundTransparency = 1
+title.Size = UDim2.new(1,0,0.08,0)
 title.Text = "Trung Kien Support"
+title.BackgroundTransparency = 1
 title.TextColor3 = Color3.new(1,1,1)
 title.Font = Enum.Font.GothamBold
 title.TextScaled = true
 
+-- NÚT ẨN/MỞ
+local toggle = Instance.new("TextButton", frame)
+toggle.Size = UDim2.new(0,30,0,30)
+toggle.Position = UDim2.new(1,-35,0,5)
+toggle.Text = "X"
+toggle.BackgroundColor3 = Color3.fromRGB(50,0,0)
+
+local openBtn = Instance.new("TextButton", gui)
+openBtn.Size = UDim2.new(0,100,0,30)
+openBtn.Position = UDim2.new(0,10,0,10)
+openBtn.Text = "OPEN"
+openBtn.Visible = false
+
+toggle.MouseButton1Click:Connect(function()
+	frame.Visible = false
+	openBtn.Visible = true
+end)
+
+openBtn.MouseButton1Click:Connect(function()
+	frame.Visible = true
+	openBtn.Visible = false
+end)
+
 -- BUTTON
 local function btn(txt,pos)
 	local b = Instance.new("TextButton", frame)
-	b.Size = UDim2.new(0.9,0,0.08,0)
+	b.Size = UDim2.new(0.9,0,0.07,0)
 	b.Position = pos
 	b.Text = txt
 	b.BackgroundColor3 = Color3.fromRGB(30,30,30)
 	b.TextColor3 = Color3.new(1,1,1)
 	b.Font = Enum.Font.GothamBold
-	Instance.new("UICorner", b)
 	return b
 end
 
-local aimBtn = btn("AIMBOT OFF", UDim2.new(0.05,0,0.12,0))
-local autoBtn = btn("AUTOCLICK OFF (F)", UDim2.new(0.05,0,0.22,0))
-local speedBtn = btn("SPEED x1", UDim2.new(0.05,0,0.32,0))
-local jumpBtn = btn("JUMP x1", UDim2.new(0.05,0,0.42,0))
-local fpsBtn = btn("LOW GRAPHICS", UDim2.new(0.05,0,0.52,0))
+local aimBtn = btn("AIMBOT OFF", UDim2.new(0.05,0,0.1,0))
+local autoBtn = btn("AUTOCLICK (F)", UDim2.new(0.05,0,0.18,0))
 
--- INFO TEXT
+local speedUp = btn("SPEED +", UDim2.new(0.05,0,0.26,0))
+local speedDown = btn("SPEED -", UDim2.new(0.05,0,0.34,0))
+
+local jumpUp = btn("JUMP +", UDim2.new(0.05,0,0.42,0))
+local jumpDown = btn("JUMP -", UDim2.new(0.05,0,0.5,0))
+
+local gfxBtn = btn("GRAPHICS 0%", UDim2.new(0.05,0,0.58,0))
+
+-- INFO
 local info = Instance.new("TextLabel", frame)
 info.Size = UDim2.new(1,0,0.2,0)
-info.Position = UDim2.new(0,0,0.7,0)
+info.Position = UDim2.new(0,0,0.75,0)
 info.BackgroundTransparency = 1
 info.Font = Enum.Font.GothamBold
 info.TextScaled = true
@@ -85,11 +115,10 @@ local frames = 0
 
 RunService.RenderStepped:Connect(function()
 	frames += 1
-	if tick() - last >= 1 then
+	if tick()-last >=1 then
 		local fps = frames
 		frames = 0
 		last = tick()
-		
 		local ping = math.floor(player:GetNetworkPing()*1000)
 		info.Text = "FPS: "..fps.." | Ping: "..ping
 	end
@@ -107,19 +136,36 @@ end)
 
 -- AIMBOT
 local function getNearest()
-	local near,dist = nil,math.huge
+	local near,dist=nil,math.huge
 	for _,v in pairs(Players:GetPlayers()) do
 		if v~=player and v.Team~=player.Team and v.Character and v.Character:FindFirstChild("Head") then
-			local d = (player.Character.HumanoidRootPart.Position - v.Character.HumanoidRootPart.Position).Magnitude
+			local d=(player.Character.HumanoidRootPart.Position - v.Character.HumanoidRootPart.Position).Magnitude
 			if d<dist then dist=d near=v end
 		end
 	end
 	return near
 end
 
+local function getNextTarget()
+	local list={}
+	for _,v in pairs(Players:GetPlayers()) do
+		if v~=player and v.Team~=player.Team and v.Character and v.Character:FindFirstChild("Head") then
+			local d=(player.Character.HumanoidRootPart.Position - v.Character.HumanoidRootPart.Position).Magnitude
+			table.insert(list,{p=v,d=d})
+		end
+	end
+	table.sort(list,function(a,b)return a.d<b.d end)
+	for i,v in pairs(list) do
+		if v.p==currentTarget then
+			return list[i+1] and list[i+1].p or list[1].p
+		end
+	end
+	return list[1] and list[1].p
+end
+
 RunService.RenderStepped:Connect(function()
 	if AIMBOT and currentTarget then
-		local c = currentTarget.Character
+		local c=currentTarget.Character
 		if c and c:FindFirstChild("Head") then
 			camera.CFrame = CFrame.new(camera.CFrame.Position, c.Head.Position)
 		end
@@ -129,18 +175,21 @@ end)
 aimBtn.MouseButton1Click:Connect(function()
 	AIMBOT = not AIMBOT
 	aimBtn.Text = "AIMBOT "..(AIMBOT and "ON" or "OFF")
-	if AIMBOT then currentTarget = getNearest() end
+	if AIMBOT then currentTarget=getNearest() end
 end)
 
--- AUTO CLICK
+-- G đổi target
 UIS.InputBegan:Connect(function(i,g)
 	if g then return end
-	if i.KeyCode == CLICK_KEY then
-		AUTOCLICK = not AUTOCLICK
-		autoBtn.Text = "AUTOCLICK "..(AUTOCLICK and "ON" or "OFF")
+	if i.KeyCode==Enum.KeyCode.G then
+		currentTarget=getNextTarget()
+	end
+	if i.KeyCode==CLICK_KEY then
+		AUTOCLICK=not AUTOCLICK
 	end
 end)
 
+-- AUTO CLICK
 task.spawn(function()
 	while true do
 		if AUTOCLICK then
@@ -151,35 +200,45 @@ task.spawn(function()
 end)
 
 -- SPEED
-local speed = 16
-speedBtn.MouseButton1Click:Connect(function()
-	speed = math.clamp(speed*2,16,10000)
+speedUp.MouseButton1Click:Connect(function()
+	speed = math.clamp(speed+50,16,10000)
 	player.Character.Humanoid.WalkSpeed = speed
-	speedBtn.Text = "SPEED "..speed
+end)
+
+speedDown.MouseButton1Click:Connect(function()
+	speed = math.clamp(speed-50,16,10000)
+	player.Character.Humanoid.WalkSpeed = speed
 end)
 
 -- JUMP
-local jump = 50
-jumpBtn.MouseButton1Click:Connect(function()
-	jump = math.clamp(jump*2,50,10000)
+jumpUp.MouseButton1Click:Connect(function()
+	jump = math.clamp(jump+50,50,10000)
 	player.Character.Humanoid.JumpPower = jump
-	jumpBtn.Text = "JUMP "..jump
 end)
 
--- LOW GRAPHICS
-fpsBtn.MouseButton1Click:Connect(function()
+jumpDown.MouseButton1Click:Connect(function()
+	jump = math.clamp(jump-50,50,10000)
+	player.Character.Humanoid.JumpPower = jump
+end)
+
+-- GRAPHICS 10% → 90%
+gfxBtn.MouseButton1Click:Connect(function()
+	graphics = graphics + 10
+	if graphics > 90 then graphics = 10 end
+	
 	for _,v in pairs(workspace:GetDescendants()) do
 		if v:IsA("BasePart") then
 			v.Material = Enum.Material.Plastic
-			v.Reflectance = 0
 		end
 	end
-	settings().Rendering.QualityLevel = 1
+	
+	settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+	gfxBtn.Text = "GRAPHICS "..graphics.."%"
 end)
 
 -- ANTI AFK
 player.Idled:Connect(function()
-	VirtualUser:Button2Down(Vector2.new(0,0),workspace.CurrentCamera.CFrame)
+	VirtualUser:Button2Down(Vector2.new(0,0),camera.CFrame)
 	task.wait(1)
-	VirtualUser:Button2Up(Vector2.new(0,0),workspace.CurrentCamera.CFrame)
+	VirtualUser:Button2Up(Vector2.new(0,0),camera.CFrame)
 end)
