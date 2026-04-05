@@ -1,0 +1,185 @@
+pcall(function()
+	if game.CoreGui:FindFirstChild("KienHub") then
+		game.CoreGui.KienHub:Destroy()
+	end
+end)
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+local VirtualUser = game:GetService("VirtualUser")
+
+local player = Players.LocalPlayer
+local camera = workspace.CurrentCamera
+
+-- STATE
+local AIMBOT = false
+local AUTOCLICK = false
+local currentTarget = nil
+local CLICK_DELAY = 0.1
+local CLICK_KEY = Enum.KeyCode.F
+
+-- GUI
+local gui = Instance.new("ScreenGui", game.CoreGui)
+gui.Name = "KienHub"
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0,320,0,420)
+frame.Position = UDim2.new(0.03,0,0.2,0)
+frame.BackgroundColor3 = Color3.fromRGB(15,15,15)
+frame.Active = true
+frame.Draggable = true
+Instance.new("UICorner", frame)
+
+-- 🌈 Rainbow Stroke
+local stroke = Instance.new("UIStroke", frame)
+stroke.Thickness = 3
+task.spawn(function()
+	while true do
+		for i=0,1,0.01 do
+			stroke.Color = Color3.fromHSV(i,1,1)
+			task.wait()
+		end
+	end
+end)
+
+-- TITLE
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1,0,0.1,0)
+title.BackgroundTransparency = 1
+title.Text = "Trung Kien Support"
+title.TextColor3 = Color3.new(1,1,1)
+title.Font = Enum.Font.GothamBold
+title.TextScaled = true
+
+-- BUTTON
+local function btn(txt,pos)
+	local b = Instance.new("TextButton", frame)
+	b.Size = UDim2.new(0.9,0,0.08,0)
+	b.Position = pos
+	b.Text = txt
+	b.BackgroundColor3 = Color3.fromRGB(30,30,30)
+	b.TextColor3 = Color3.new(1,1,1)
+	b.Font = Enum.Font.GothamBold
+	Instance.new("UICorner", b)
+	return b
+end
+
+local aimBtn = btn("AIMBOT OFF", UDim2.new(0.05,0,0.12,0))
+local autoBtn = btn("AUTOCLICK OFF (F)", UDim2.new(0.05,0,0.22,0))
+local speedBtn = btn("SPEED x1", UDim2.new(0.05,0,0.32,0))
+local jumpBtn = btn("JUMP x1", UDim2.new(0.05,0,0.42,0))
+local fpsBtn = btn("LOW GRAPHICS", UDim2.new(0.05,0,0.52,0))
+
+-- INFO TEXT
+local info = Instance.new("TextLabel", frame)
+info.Size = UDim2.new(1,0,0.2,0)
+info.Position = UDim2.new(0,0,0.7,0)
+info.BackgroundTransparency = 1
+info.Font = Enum.Font.GothamBold
+info.TextScaled = true
+
+-- FPS + PING
+local last = tick()
+local frames = 0
+
+RunService.RenderStepped:Connect(function()
+	frames += 1
+	if tick() - last >= 1 then
+		local fps = frames
+		frames = 0
+		last = tick()
+		
+		local ping = math.floor(player:GetNetworkPing()*1000)
+		info.Text = "FPS: "..fps.." | Ping: "..ping
+	end
+end)
+
+-- Rainbow text
+task.spawn(function()
+	while true do
+		for i=0,1,0.01 do
+			info.TextColor3 = Color3.fromHSV(i,1,1)
+			task.wait()
+		end
+	end
+end)
+
+-- AIMBOT
+local function getNearest()
+	local near,dist = nil,math.huge
+	for _,v in pairs(Players:GetPlayers()) do
+		if v~=player and v.Team~=player.Team and v.Character and v.Character:FindFirstChild("Head") then
+			local d = (player.Character.HumanoidRootPart.Position - v.Character.HumanoidRootPart.Position).Magnitude
+			if d<dist then dist=d near=v end
+		end
+	end
+	return near
+end
+
+RunService.RenderStepped:Connect(function()
+	if AIMBOT and currentTarget then
+		local c = currentTarget.Character
+		if c and c:FindFirstChild("Head") then
+			camera.CFrame = CFrame.new(camera.CFrame.Position, c.Head.Position)
+		end
+	end
+end)
+
+aimBtn.MouseButton1Click:Connect(function()
+	AIMBOT = not AIMBOT
+	aimBtn.Text = "AIMBOT "..(AIMBOT and "ON" or "OFF")
+	if AIMBOT then currentTarget = getNearest() end
+end)
+
+-- AUTO CLICK
+UIS.InputBegan:Connect(function(i,g)
+	if g then return end
+	if i.KeyCode == CLICK_KEY then
+		AUTOCLICK = not AUTOCLICK
+		autoBtn.Text = "AUTOCLICK "..(AUTOCLICK and "ON" or "OFF")
+	end
+end)
+
+task.spawn(function()
+	while true do
+		if AUTOCLICK then
+			mouse1click()
+		end
+		task.wait(CLICK_DELAY)
+	end
+end)
+
+-- SPEED
+local speed = 16
+speedBtn.MouseButton1Click:Connect(function()
+	speed = math.clamp(speed*2,16,10000)
+	player.Character.Humanoid.WalkSpeed = speed
+	speedBtn.Text = "SPEED "..speed
+end)
+
+-- JUMP
+local jump = 50
+jumpBtn.MouseButton1Click:Connect(function()
+	jump = math.clamp(jump*2,50,10000)
+	player.Character.Humanoid.JumpPower = jump
+	jumpBtn.Text = "JUMP "..jump
+end)
+
+-- LOW GRAPHICS
+fpsBtn.MouseButton1Click:Connect(function()
+	for _,v in pairs(workspace:GetDescendants()) do
+		if v:IsA("BasePart") then
+			v.Material = Enum.Material.Plastic
+			v.Reflectance = 0
+		end
+	end
+	settings().Rendering.QualityLevel = 1
+end)
+
+-- ANTI AFK
+player.Idled:Connect(function()
+	VirtualUser:Button2Down(Vector2.new(0,0),workspace.CurrentCamera.CFrame)
+	task.wait(1)
+	VirtualUser:Button2Up(Vector2.new(0,0),workspace.CurrentCamera.CFrame)
+end)
